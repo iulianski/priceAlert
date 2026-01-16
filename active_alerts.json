@@ -1,0 +1,32 @@
+{
+  "8387611432": {
+    "3": {
+      "symbol": "BARDUSDT",
+      "target": 0.74,
+      "initial": 0.7715,
+      "last_price": 0.7499,
+      "exchange": "binance"
+    },
+    "4": {
+      "symbol": "BARDUSDT",
+      "target": 0.73,
+      "initial": 0.7716,
+      "last_price": 0.7498,
+      "exchange": "binance"
+    },
+    "6": {
+      "symbol": "ZIGUSDT",
+      "target": 0.063,
+      "initial": 0.06028,
+      "last_price": 0.06017,
+      "exchange": "mexc"
+    },
+    "7": {
+      "symbol": "ZIGUSDT",
+      "target": 0.08,
+      "initial": 0.06028,
+      "last_price": 0.06017,
+      "exchange": "mexc"
+    }
+  }
+}
