@@ -516,8 +516,16 @@ async def check_alerts(context: ContextTypes.DEFAULT_TYPE):
                     'mexc': f"https://futures.mexc.com/exchange/{symbol.replace('USDT', '_USDT')}"
                 }
                 
+                exchange_mobile_urls = {
+                    'binance': f"https://app.binance.com/en/futures/{symbol}",
+                    'bybit': f"https://www.bybit.com/app/trade/usdt/{symbol}",
+                    'bitget': f"https://mobile.bitget.com/en/futures/usdt/{symbol}",
+                    'mexc': f"https://www.mexc.com/download"
+                }
+                
                 keyboard = [
-                    [InlineKeyboardButton(f"🔗 Open on {exchange.upper()}", url=exchange_urls.get(exchange, "https://www.binance.com"))]
+                    [InlineKeyboardButton(f"🔗 {exchange.upper()}", url=exchange_urls.get(exchange, "https://www.binance.com"))],
+                    [InlineKeyboardButton(f"📱 {exchange.upper()}", url=exchange_mobile_urls.get(exchange, "https://www.binance.com"))]
                 ]
                 reply_markup = InlineKeyboardMarkup(keyboard)
                 
