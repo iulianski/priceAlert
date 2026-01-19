@@ -153,21 +153,18 @@ async def get_price(symbol: str, exchange: str) -> float:
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Send welcome message"""
     await update.message.reply_text(
-        "🚀 Welcome to Multi-Exchange Crypto Alert Bot!\n\n"
+        "🚀 Welcome to Crypto Alert Bot!\n\n"
         "Usage (Simple):\n"
-        "BTC 96000          → Binance (default)\n"
-        "ETH 3500           → Binance (default)\n\n"
+        "BTC 96000\n\n"
         "Usage (With Exchange):\n"
-        "BTC 96000 bybit\n"
-        "SOL 150 bitget\n\n"
+        "BTC 96000 bybit\n\n"
         "Supported exchanges:\n"
-        "• Binance (default)\n"
+        "• Binance\n"
         "• Bybit\n"
         "• Bitget\n"
         "• MEXC\n\n"
         "Commands:\n"
         "/list - Show active alerts\n"
-        "/compare SYMBOL - Compare prices\n"
         "/remove SYMBOL - Remove alert\n"
         "/clear - Clear all alerts"
     )
@@ -245,63 +242,6 @@ async def clear_alerts(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("✅ All alerts cleared")
     else:
         await update.message.reply_text("📭 No alerts to clear")
-
-async def compare_prices(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Compare price across all exchanges"""
-    if not context.args:
-        await update.message.reply_text("Usage: /compare BTC")
-        return
-    
-    symbol = context.args[0].upper()
-    
-    # Fetch prices from all exchanges
-    exchanges = ['binance', 'bybit', 'bitget', 'mexc']
-    prices = {}
-    
-    for exchange in exchanges:
-        price = await get_price(symbol, exchange)
-        if price is not None:
-            prices[exchange] = price
-    
-    if not prices:
-        await update.message.reply_text(f"❌ Symbol {symbol} not found on any exchange")
-        return
-    
-    # Exchange emojis (color-coded)
-    exchange_emojis = {
-        'binance': '🟡',  # Yellow
-        'bybit': '🟠',    # Orange
-        'bitget': '🩵',   # Cyan
-        'mexc': '🔵'      # Blue
-    }
-    
-    message = f"💱 Price Comparison for {symbol}:\n\n"
-    
-    for exchange in exchanges:
-        if exchange in prices:
-            price = prices[exchange]
-            emoji = exchange_emojis.get(exchange, '⚪')
-            # Format price naturally, removing trailing zeros
-            price_str = f"${price:,.8f}".rstrip('0').rstrip('.')
-            # Add comma separator for large numbers
-            if price >= 1000:
-                price_str = f"${price:,g}"
-            message += f"{emoji} {exchange.upper()}: {price_str}\n"
-    
-    # Calculate spread
-    if len(prices) > 1:
-        best_price = min(prices.values())
-        worst_price = max(prices.values())
-        spread = worst_price - best_price
-        spread_pct = (spread / best_price) * 100
-        
-        spread_str = f"${spread:,.8f}".rstrip('0').rstrip('.')
-        if spread >= 1000:
-            spread_str = f"${spread:,g}"
-        
-        message += f"\n📊 Spread: {spread_str} ({spread_pct:.2f}%)"
-    
-    await update.message.reply_text(message)
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle incoming alert requests"""
@@ -418,14 +358,20 @@ async def set_alert(update: Update, chat_id: int, symbol: str, target_price: flo
     # Save to file
     save_alerts()
     
-    direction = "below" if target_price < current_price else "above"
+    # Determine direction symbol
+    direction_symbol = "<" if target_price < current_price else ">"
+    
+    # Exchange emojis
+    exchange_emojis = {
+        'binance': '🟡',
+        'bybit': '🟠',
+        'bitget': '🌐',
+        'mexc': '🔵'
+    }
+    exchange_emoji = exchange_emojis.get(exchange, '⚪')
+    
     await update.message.reply_text(
-        f"✅ Alert set!\n\n"
-        f"Symbol: {symbol}\n"
-        f"Exchange: {exchange.upper()}\n"
-        f"Target: ${target_price:g}\n"
-        f"Current: ${current_price:g}\n"
-        f"Alert: When price crosses {direction} ${target_price:g}"
+        f"✅ Alert: {symbol}/{exchange.upper()} {direction_symbol} ${target_price:g}"
     )
 
 async def set_alert_from_callback(query, chat_id: int, symbol: str, target_price: float, exchange: str):
@@ -456,14 +402,20 @@ async def set_alert_from_callback(query, chat_id: int, symbol: str, target_price
     # Save to file
     save_alerts()
     
-    direction = "below" if target_price < current_price else "above"
+    # Determine direction symbol
+    direction_symbol = "<" if target_price < current_price else ">"
+    
+    # Exchange emojis
+    exchange_emojis = {
+        'binance': '🟡',
+        'bybit': '🟠',
+        'bitget': '🌐',
+        'mexc': '🔵'
+    }
+    exchange_emoji = exchange_emojis.get(exchange, '⚪')
+    
     await query.edit_message_text(
-        f"✅ Alert set!\n\n"
-        f"Symbol: {symbol}\n"
-        f"Exchange: {exchange.upper()}\n"
-        f"Target: ${target_price:g}\n"
-        f"Current: ${current_price:g}\n"
-        f"Alert: When price crosses {direction} ${target_price:g}"
+        f"✅ Alert: {symbol}/{exchange.upper()} {direction_symbol} ${target_price:g}"
     )
 
 async def check_alerts(context: ContextTypes.DEFAULT_TYPE):
@@ -481,34 +433,54 @@ async def check_alerts(context: ContextTypes.DEFAULT_TYPE):
             if current_price is None:
                 continue
             
-            # Check if price CROSSED the target
+            # Check if price CROSSED the target (must actually cross, not equal)
             triggered = False
             
-            # For downward alerts
+            # For downward alerts (target < initial)
             if target_price < initial_price:
-                if last_price > target_price and current_price <= target_price:
+                # Last price was above target, current is below (not equal)
+                if last_price > target_price and current_price < target_price:
                     triggered = True
             
-            # For upward alerts
+            # For upward alerts (target > initial)
             elif target_price > initial_price:
-                if last_price < target_price and current_price >= target_price:
+                # Last price was below target, current is above (not equal)
+                if last_price < target_price and current_price > target_price:
                     triggered = True
             
             # Update last price
             active_alerts[chat_id][alert_id]['last_price'] = current_price
             
             if triggered:
+                from datetime import datetime
+                
                 direction = "dropped below" if target_price < initial_price else "rose above"
+                
+                # Exchange circle emojis (matching colors)
+                exchange_emojis = {
+                    'binance': '🟡',  # Yellow circle
+                    'bybit': '🟠',    # Orange circle
+                    'bitget': '🌐',   # Globe for Bitget
+                    'mexc': '🔵'      # Blue circle
+                }
+                
+                exchange_emoji = exchange_emojis.get(exchange, '🤍')
+                
+                # Coin emoji - green if up, red if down
+                coin_emoji = '🟢' if current_price > target_price else '🔴'
+                
+                # Get current time
+                current_time = datetime.now().strftime('%H:%M:%S')
+                
                 message = (
-                    f"🔔 PRICE ALERT!\n\n"
-                    f"Symbol: {symbol}\n"
-                    f"Exchange: {exchange.upper()}\n"
-                    f"Target: ${target_price:g}\n"
-                    f"Current: ${current_price:g}\n"
-                    f"Status: ✅ Price {direction} target!"
+                    f"{coin_emoji} `${symbol}`\n"
+                    f"{exchange_emoji} {exchange.upper()}\n\n"
+                    f"_Target price: ${target_price:g}_\n"
+                    f"_Current price: ${current_price:g}_\n\n"
+                    f"🕓 {current_time}"
                 )
                 
-                # Create buttons for the alert
+                # Create button for the alert
                 exchange_urls = {
                     'binance': f"https://www.binance.com/en/futures/{symbol}",
                     'bybit': f"https://www.bybit.com/trade/usdt/{symbol}",
@@ -516,16 +488,8 @@ async def check_alerts(context: ContextTypes.DEFAULT_TYPE):
                     'mexc': f"https://futures.mexc.com/exchange/{symbol.replace('USDT', '_USDT')}"
                 }
                 
-                exchange_mobile_urls = {
-                    'binance': f"https://app.binance.com/en/futures/{symbol}",
-                    'bybit': f"bybit://trade/{symbol}",
-                    'bitget': f"https://www.bitget.com/en/futures/usdt/{symbol}",
-                    'mexc': f"https://www.mexc.com/futures/trading/{symbol.replace('USDT', '_USDT')}"
-                }
-                
                 keyboard = [
-                    [InlineKeyboardButton(f"💻 {exchange.upper()}", url=exchange_urls.get(exchange, "https://www.binance.com"))],
-                    [InlineKeyboardButton(f"📱 {exchange.upper()}", url=exchange_mobile_urls.get(exchange, "https://www.binance.com"))]
+                    [InlineKeyboardButton(f"🔗 {exchange.upper()}", url=exchange_urls.get(exchange, "https://www.binance.com"))]
                 ]
                 reply_markup = InlineKeyboardMarkup(keyboard)
                 
@@ -533,7 +497,8 @@ async def check_alerts(context: ContextTypes.DEFAULT_TYPE):
                     await context.bot.send_message(
                         chat_id=chat_id, 
                         text=message,
-                        reply_markup=reply_markup
+                        reply_markup=reply_markup,
+                        parse_mode='Markdown'
                     )
                     
                     # Remove triggered alert
@@ -555,7 +520,6 @@ def main():
     # Add handlers
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("list", list_alerts))
-    app.add_handler(CommandHandler("compare", compare_prices))
     app.add_handler(CommandHandler("remove", remove_alert))
     app.add_handler(CommandHandler("clear", clear_alerts))
     app.add_handler(CallbackQueryHandler(button_callback))
